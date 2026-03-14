@@ -3,7 +3,6 @@ import requests
 import uuid
 from datetime import datetime
 import json
-import os
 
 st.set_page_config(page_title="My AI Chat", layout="wide")
 
@@ -58,23 +57,6 @@ def get_response(messages, placeholder):
     except requests.exceptions.RequestException as e:
         return f"Error: {str(e)}"
 
-# Function to save chat
-def save_chat(chat):
-    filename = f"chats/{chat['id']}.json"
-    with open(filename, 'w') as f:
-        json.dump(chat, f)
-
-# Function to load chats
-def load_chats():
-    chats = []
-    if os.path.exists("chats"):
-        for file in os.listdir("chats"):
-            if file.endswith(".json"):
-                with open(f"chats/{file}", 'r') as f:
-                    chat = json.load(f)
-                    chats.append(chat)
-    return chats
-
 # Function to extract memory
 def extract_memory(user_message):
     headers = {"Authorization": f"Bearer {hf_token}"}
@@ -97,27 +79,13 @@ def extract_memory(user_message):
     except:
         return {}
 
-# Load memory
-def load_memory():
-    if os.path.exists("memory.json"):
-        with open("memory.json", 'r') as f:
-            return json.load(f)
-    return {}
-
-# Save memory
-def save_memory(memory):
-    with open("memory.json", 'w') as f:
-        json.dump(memory, f)
-
-# Initialize memory
-if "memory" not in st.session_state:
-    st.session_state.memory = load_memory()
-
 # Initialize session state
 if "chats" not in st.session_state:
-    st.session_state.chats = load_chats()
+    st.session_state.chats = []
 if "active_chat_id" not in st.session_state:
-    st.session_state.active_chat_id = st.session_state.chats[0]["id"] if st.session_state.chats else None
+    st.session_state.active_chat_id = None
+if "memory" not in st.session_state:
+    st.session_state.memory = {}
 
 # Sidebar
 with st.sidebar:
@@ -130,7 +98,6 @@ with st.sidebar:
             "messages": []
         }
         st.session_state.chats.append(new_chat)
-        save_chat(new_chat)
         st.session_state.active_chat_id = chat_id
         st.rerun()
 
@@ -144,7 +111,6 @@ with st.sidebar:
                 st.rerun()
         with col2:
             if st.button("✕", key=f"delete_{chat['id']}"):
-                delete_chat_file(chat["id"])
                 st.session_state.chats.pop(i)
                 if st.session_state.active_chat_id == chat["id"]:
                     st.session_state.active_chat_id = st.session_state.chats[0]["id"] if st.session_state.chats else None
@@ -158,7 +124,6 @@ with st.sidebar:
             st.write("No memory stored.")
         if st.button("Clear Memory"):
             st.session_state.memory = {}
-            save_memory({})
             st.rerun()
 
 # Get active chat
@@ -198,13 +163,9 @@ if active_chat:
         new_memory = extract_memory(prompt)
         if new_memory:
             st.session_state.memory.update(new_memory)
-            save_memory(st.session_state.memory)
 
         # Update title if first message
         if len(active_chat["messages"]) == 2:  # user and assistant
             active_chat["title"] = prompt[:30] + "..." if len(prompt) > 30 else prompt
-
-        # Save chat
-        save_chat(active_chat)
 else:
     st.write("No active chat. Create a new chat to start.")
